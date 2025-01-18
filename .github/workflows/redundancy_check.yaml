@@ -26,4 +26,4 @@ jobs:
 
     - name: Run redundancy check
       run: |
-        python check_redundancy.py
+        python scripts/redundancy_check.py
