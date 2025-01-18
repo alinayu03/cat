@@ -11,18 +11,18 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout code
+    - name: Check out code
       uses: actions/checkout@v3
 
-    - name: Setup Python
+    - name: Set up Python
       uses: actions/setup-python@v4
       with:
-        python-version: '3.9'
+        python-version: 3.9
 
     - name: Install dependencies
       run: |
         pip install --upgrade pip
-        pip install torch faiss-cpu transformers colorama  # plus any other needed packages
+        pip install torch faiss-cpu transformers colorama
 
     - name: Run redundancy check
       run: |
