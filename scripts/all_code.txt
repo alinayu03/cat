@@ -1,0 +1,314 @@
+# animators.py
+
+import os
+import time
+import random
+from colorama import init, Fore, Style
+from frames import FrameManager, Frame
+
+init(autoreset=True)
+
+class BaseAnimator:
+    def __init__(self, frame_manager, delay=0.4, repeat=1, clear_screen=True):
+        if not isinstance(frame_manager, FrameManager):
+            raise ValueError("Must pass a FrameManager.")
+        self.frame_manager = frame_manager
+        self.delay = delay
+        self.repeat = repeat
+        self.clear_screen = clear_screen
+
+    def _clear_console(self):
+        if self.clear_screen:
+            os.system("cls" if os.name == "nt" else "clear")
+
+    def animate(self):
+        raise NotImplementedError("Implement in subclasses.")
+
+class SpinningCatAnimator(BaseAnimator):
+    def animate(self):
+        if len(self.frame_manager) == 0:
+            print("No frames to animate.")
+            return
+        for cycle in range(self.repeat):
+            for idx, frame in enumerate(self.frame_manager.get_frames()):
+                self._clear_console()
+                cycle_str = Fore.YELLOW + f"Cycle {cycle+1}/{self.repeat}"
+                frame_str = Fore.CYAN + f"Frame {idx+1}/{len(self.frame_manager)}"
+                print(f"{cycle_str}, {frame_str}\n")
+                print(Fore.GREEN + str(frame))
+                time.sleep(self.delay)
+
+class FancySpinningCatAnimator(SpinningCatAnimator):
+    def __init__(self, frame_manager, delay=0.4, repeat=1, clear_screen=True, facts=None):
+        super().__init__(frame_manager, delay, repeat, clear_screen)
+        self.facts = facts if facts else []
+
+    def _show_fact(self):
+        if not self.facts:
+            return
+        fact = random.choice(self.facts)
+        print(Fore.MAGENTA + f"Cat Fact: {fact}\n")
+
+    def animate(self):
+        if len(self.frame_manager) == 0:
+            print("No frames to animate.")
+            return
+        for cycle in range(self.repeat):
+            for idx, frame in enumerate(self.frame_manager.get_frames()):
+                self._clear_console()
+                c_str = Fore.YELLOW + f"Fancy Cycle {cycle+1}/{self.repeat}"
+                f_str = Fore.CYAN + f"Frame {idx+1}/{len(self.frame_manager)}"
+                print(f"{c_str}, {f_str}\n")
+                print(Fore.GREEN + str(frame))
+                time.sleep(self.delay)
+                self._show_fact()
+                time.sleep(self.delay / 2)
+
+class ShakySpinningCatAnimator(SpinningCatAnimator):
+    def __init__(self, frame_manager, delay=0.4, repeat=1, clear_screen=True, amplitude=2):
+        super().__init__(frame_manager, delay, repeat, clear_screen)
+        self.amplitude = amplitude
+
+    def _shake_lines(self, text):
+        lines = text.split("\n")
+        new_lines = []
+        for ln in lines:
+            offset = random.randint(-self.amplitude, self.amplitude)
+            if offset > 0:
+                new_lines.append(" " * offset + ln)
+            else:
+                new_lines.append(ln)
+        return "\n".join(new_lines)
+
+    def animate(self):
+        if len(self.frame_manager) == 0:
+            print("No frames to animate.")
+            return
+        for cycle in range(self.repeat):
+            for idx, frame in enumerate(self.frame_manager.get_frames()):
+                self._clear_console()
+                c_str = Fore.YELLOW + f"Shaky Cycle {cycle+1}/{self.repeat}"
+                f_str = Fore.CYAN + f"Frame {idx+1}/{len(self.frame_manager)}"
+                print(f"{c_str}, {f_str}\n")
+                shaken = self._shake_lines(frame.ascii_art)
+                print(Fore.GREEN + shaken)
+                time.sleep(self.delay)
+
+
+# frames.py
+
+import random
+
+class Frame:
+    def __init__(self, ascii_art, name=None):
+        self.ascii_art = ascii_art
+        self.name = name
+
+    def __str__(self):
+        return self.ascii_art
+
+class FrameManager:
+    def __init__(self):
+        self.frames = []
+
+    def add_frame(self, frame):
+        if not isinstance(frame, Frame):
+            raise TypeError("Only Frame instances allowed.")
+        self.frames.append(frame)
+
+    def load_frames(self, items):
+        for item in items:
+            if isinstance(item, tuple):
+                art, nm = item
+                self.add_frame(Frame(art, nm))
+            else:
+                self.add_frame(Frame(item))
+
+    def get_frames(self):
+        return self.frames
+
+    def __len__(self):
+        return len(self.frames)
+
+class RandomFrameTransformer:
+    def __init__(self, flip_chance=0.2, mutate_chance=0.2):
+        self.flip_chance = flip_chance
+        self.mutate_chance = mutate_chance
+
+    def _flip_text(self, text):
+        lines = text.split("\n")
+        return "\n".join(lines[::-1])
+
+    def _insert_random_string(self, text):
+        lines = text.split("\n")
+        insertables = [" ~^~ ", " O.O ", " x_x ", " <3 ", " ^^ ", " *.* "]
+        if lines:
+            idx = random.randint(0, len(lines)-1)
+            extra = random.choice(insertables)
+            lines[idx] += extra
+        return "\n".join(lines)
+
+    def transform_frames(self, frame_manager):
+        for i, f in enumerate(frame_manager.get_frames()):
+            transformed = f.ascii_art
+            do_flip = random.random() < self.flip_chance
+            do_mutate = random.random() < self.mutate_chance
+            if do_flip:
+                transformed = self._flip_text(transformed)
+            if do_mutate:
+                transformed = self._insert_random_string(transformed)
+            frame_manager.frames[i] = Frame(transformed, f.name)
+
+
+# main.py
+
+import sys
+from frames import FrameManager, RandomFrameTransformer
+from animators import (
+    SpinningCatAnimator,
+    FancySpinningCatAnimator,
+    ShakySpinningCatAnimator
+)
+from sound_player import SoundPlayer
+
+class AnimationMenu:
+    def __init__(self, animators):
+        if not isinstance(animators, dict):
+            raise ValueError("animators must be dict of name->animator.")
+        self.animators = animators
+
+    def _show_menu(self):
+        print("\n=== Animation Menu ===")
+        i = 1
+        for name in self.animators.keys():
+            print(f"{i}. {name}")
+            i += 1
+        print("0. Exit")
+
+    def run(self, sound_player=None):
+        while True:
+            self._show_menu()
+            choice = input("Choose an option: ")
+            if choice.isdigit():
+                val = int(choice)
+            else:
+                print("Invalid input.")
+                continue
+            if val == 0:
+                print("Goodbye!")
+                break
+            keys = list(self.animators.keys())
+            if 1 <= val <= len(keys):
+                key = keys[val - 1]
+                print(f"You chose: {key}")
+                if sound_player:
+                    # <--- NEW: Start the MP3 on a background thread
+                    sound_player.play_sound_in_background()
+                # Now run the chosen animation in the main thread
+                self.animators[key].animate()
+            else:
+                print("Invalid choice.")
+
+def build_cat_frames():
+    return [
+        r"""
+ /\_/\  
+( o.o ) 
+ > ^ <  
+""",
+        r"""
+  |\---/|
+ /  o.o  \
+ >   ^   <  
+""",
+        r"""
+   .-=-.  
+   (o.o) 
+    \^/   
+""",
+        r"""
+  |\___/|
+ ( o.o ) 
+  > ^ <  
+""",
+        r"""
+   /\_/\ 
+  ( -.- )
+   > ^ <  
+""",
+        r"""
+   |\---/|
+  /  -.-  \
+  >   ^   <  
+""",
+        r"""
+    .-=-.  
+    (-.-) 
+     \^/   
+""",
+        r"""
+   |\___/|
+  ( -.- )
+   > ^ <  
+"""
+    ]
+
+def main():
+    fm = FrameManager()
+    fm.load_frames(build_cat_frames())
+
+    transformer = RandomFrameTransformer(flip_chance=0.2, mutate_chance=0.3)
+    transformer.transform_frames(fm)
+
+    spinner = SpinningCatAnimator(fm, delay=0.3, repeat=1)
+    fancy = FancySpinningCatAnimator(fm, delay=0.4, repeat=1, facts=[
+        "A group of cats is called a clowder.",
+        "Cats can rotate their ears 180 degrees.",
+        "A cat's nose print is unique."
+    ])
+    shaky = ShakySpinningCatAnimator(fm, delay=0.3, repeat=1, amplitude=3)
+
+    animators = {
+        "Basic Spinning Cat": spinner,
+        "Fancy Spinning Cat": fancy,
+        "Shaky Spinning Cat": shaky
+    }
+
+    menu = AnimationMenu(animators)
+    sound_player = SoundPlayer(mp3_path="cat.mp3", enabled=True)
+
+    menu.run(sound_player)
+
+if __name__ == "__main__":
+    if sys.version_info < (3, 0):
+        print("Requires Python 3+.")
+        sys.exit(1)
+    main()
+
+
+# sound_player.py
+
+import threading
+from playsound import playsound
+
+class SoundPlayer:
+    def __init__(self, mp3_path=None, enabled=True):
+        self.enabled = enabled
+        self.mp3_path = mp3_path
+
+    def play_sound_blocking(self):
+        if not self.enabled or not self.mp3_path:
+            return
+        playsound(self.mp3_path)
+
+    def play_sound_in_background(self):
+        if not self.enabled or not self.mp3_path:
+            return
+        thread = threading.Thread(
+            target=playsound, 
+            args=(self.mp3_path,),
+            daemon=True
+        )
+        thread.start()
+
+
